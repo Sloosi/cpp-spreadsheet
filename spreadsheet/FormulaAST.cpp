@@ -72,9 +72,8 @@ public:
     virtual ~Expr() = default;
     virtual void Print(std::ostream& out) const = 0;
     virtual void DoPrintFormula(std::ostream& out, ExprPrecedence precedence) const = 0;
-    virtual double Evaluate(/*добавьте сюда нужные аргументы*/ args) const = 0;
+    virtual double Evaluate(const CellGetter& cell_getter) const = 0;
 
-    // higher is tighter
     virtual ExprPrecedence GetPrecedence() const = 0;
 
     void PrintFormula(std::ostream& out, ExprPrecedence parent_precedence,
@@ -142,8 +141,29 @@ public:
         }
     }
 
-    double Evaluate(/*добавьте нужные аргументы*/) const override {
-			// Скопируйте ваше решение из предыдущих уроков.
+    double Evaluate(const CellGetter& cell_getter) const override {
+        double result = 0;
+        
+        switch (type_) {
+            case Add:
+                result = lhs_->Evaluate(cell_getter) + rhs_->Evaluate(cell_getter);
+                break;
+            case Subtract:
+                result = lhs_->Evaluate(cell_getter) - rhs_->Evaluate(cell_getter);
+                break;
+            case Multiply:
+                result = lhs_->Evaluate(cell_getter) * rhs_->Evaluate(cell_getter);
+                break;
+            case Divide:
+                result = lhs_->Evaluate(cell_getter) / rhs_->Evaluate(cell_getter);
+                break;
+        }
+
+        if (!std::isfinite(result)) {
+            throw FormulaError{ FormulaError::Category::Arithmetic };
+        }
+
+        return result;
     }
 
 private:
@@ -180,8 +200,15 @@ public:
         return EP_UNARY;
     }
 
-    double Evaluate(/*добавьте нужные аргументы*/ args) const override {
-        // Скопируйте ваше решение из предыдущих уроков.
+    double Evaluate(const CellGetter& cell_getter) const override {
+        switch(type_) {
+            case UnaryPlus:
+                return operand_->Evaluate(cell_getter);
+            case UnaryMinus:
+                return -operand_->Evaluate(cell_getter);
+            default:
+                throw std::invalid_argument("Invalid operatrion!");
+        }
     }
 
 private:
@@ -211,10 +238,10 @@ public:
         return EP_ATOM;
     }
 
-    double Evaluate(/*добавьте нужные аргументы*/ args) const override {
-        // реализуйте метод.
+    double Evaluate(const CellGetter& cell_getter) const override {
+        return cell_getter(*cell_);
     }
-
+ 
 private:
     const Position* cell_;
 };
@@ -229,7 +256,7 @@ public:
         out << value_;
     }
 
-    void DoPrintFormula(std::ostream& out, ExprPrecedence /* precedence */) const override {
+    void DoPrintFormula(std::ostream& out, ExprPrecedence) const override {
         out << value_;
     }
 
@@ -237,7 +264,7 @@ public:
         return EP_ATOM;
     }
 
-    double Evaluate(/*добавьте нужные аргументы*/ args) const override {
+    double Evaluate(const CellGetter& cell_getter) const override {
         return value_;
     }
 
@@ -374,12 +401,10 @@ FormulaAST ParseFormulaAST(std::istream& in) {
 
 FormulaAST ParseFormulaAST(const std::string& in_str) {
     std::istringstream in(in_str);
-    return ParseFormulaAST(in);
-}
-
-void FormulaAST::PrintCells(std::ostream& out) const {
-    for (auto cell : cells_) {
-        out << cell.ToString() << ' ';
+    try {
+        return ParseFormulaAST(in);
+    } catch (const std::exception& exc) {
+        std::throw_with_nested(FormulaException(exc.what()));
     }
 }
 
@@ -391,14 +416,23 @@ void FormulaAST::PrintFormula(std::ostream& out) const {
     root_expr_->PrintFormula(out, ASTImpl::EP_ATOM);
 }
 
-double FormulaAST::Execute(/*добавьте нужные аргументы*/ args) const {
-    return root_expr_->Evaluate(/*добавьте нужные аргументы*/ args);
+std::forward_list<Position> &FormulaAST::GetCells() {
+    return cells_;
 }
 
-FormulaAST::FormulaAST(std::unique_ptr<ASTImpl::Expr> root_expr, std::forward_list<Position> cells)
-    : root_expr_(std::move(root_expr))
-    , cells_(std::move(cells)) {
-    cells_.sort();  // to avoid sorting in GetReferencedCells
+const std::forward_list<Position> &FormulaAST::GetCells() const{
+    return cells_;
+}
+
+double FormulaAST::Execute(const CellGetter& cell_getter) const {
+    return root_expr_->Evaluate(cell_getter);
+}
+
+FormulaAST::FormulaAST(std::unique_ptr<ASTImpl::Expr> root_expr, std::forward_list<Position> cells) :
+    root_expr_(std::move(root_expr)),
+    cells_(std::move(cells))
+{
+    cells_.sort();
 }
 
 FormulaAST::~FormulaAST() = default;

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "common.h"
 #include "formula.h"
+#include "common.h"
 
 #include <functional>
 #include <unordered_set>
@@ -21,16 +21,20 @@ public:
     std::vector<Position> GetReferencedCells() const override;
 
     bool IsReferenced() const;
-
+    
 private:
     class Impl;
     class EmptyImpl;
     class TextImpl;
     class FormulaImpl;
 
+    bool HasCircularDependency(const Impl& impl) const;
+
+    void UpdateDependencies();
+    void InvalidateCellsCache(bool flag = false);
+
     std::unique_ptr<Impl> impl_;
-
-    // Добавьте поля и методы для связи с таблицей, проверки циклических 
-    // зависимостей, графа зависимостей и т. д.
-
+    Sheet& sheet_;
+    std::unordered_set<Cell*> dependent_cells_;
+    std::unordered_set<Cell*> referenced_cells_;
 };
