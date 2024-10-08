@@ -142,20 +142,22 @@ public:
     }
 
     double Evaluate(const CellGetter& cell_getter) const override {
+        double lhs_value = lhs_->Evaluate(cell_getter);
+        double rhs_value = rhs_->Evaluate(cell_getter);
+
         double result = 0;
-        
         switch (type_) {
             case Add:
-                result = lhs_->Evaluate(cell_getter) + rhs_->Evaluate(cell_getter);
+                result = lhs_value + rhs_value;
                 break;
             case Subtract:
-                result = lhs_->Evaluate(cell_getter) - rhs_->Evaluate(cell_getter);
+                result = lhs_value - rhs_value;
                 break;
             case Multiply:
-                result = lhs_->Evaluate(cell_getter) * rhs_->Evaluate(cell_getter);
+                result = lhs_value * rhs_value;
                 break;
             case Divide:
-                result = lhs_->Evaluate(cell_getter) / rhs_->Evaluate(cell_getter);
+                result = lhs_value / rhs_value;
                 break;
         }
 
@@ -201,14 +203,15 @@ public:
     }
 
     double Evaluate(const CellGetter& cell_getter) const override {
-        switch(type_) {
-            case UnaryPlus:
-                return operand_->Evaluate(cell_getter);
-            case UnaryMinus:
-                return -operand_->Evaluate(cell_getter);
-            default:
-                throw std::invalid_argument("Invalid operatrion!");
+        if(type_ == UnaryPlus) {
+            return operand_->Evaluate(cell_getter);
         }
+        
+        if(type_ == UnaryMinus) {
+            return -operand_->Evaluate(cell_getter);
+        }
+
+        throw std::invalid_argument("Invalid operatrion!");
     }
 
 private:
